@@ -1,6 +1,9 @@
 import socket
 import symbols
 
+from linked_list import LinkedListNode
+from linked_list import LinkedList
+
 BUY = "BUY"
 SELL = "SELL"
 
@@ -22,65 +25,51 @@ class Order:
 class Book:
     def __init__(self, symbol):
         self.symbol = symbol
-        self.bids = []
-        self.asks = []
+        self.bids = LinkedList()
+        self.asks = LinkedList()
 
         self.open_orders = {}
 
     def add(self, order, order_id):
         assert order.symbol == self.symbol
 
+        order_node = LinkedListNode(order_id, order)
+
         if order.side == BUY:
-            location = 0
-            while True:
-                if location == len(self.bids):
-                    self.bids.append((order.price, order.amount, order_id))
+            current_node = self.bids.head
+            while current_node != None:
+                if order_node.value.price > current_node.value.price:
+                    self.bids.add_before(order_node, current_node)
                     break
-
-                if order.price > self.bids[location][0]:
-                    self.bids.insert(location, (order.price, order.amount, order_id))
-                    break
-
-                location += 1
+                current_node = current_node.next
+            if current_node == None:
+                self.bids.append_back(order_node)
 
         elif order.side == SELL:
-            location = 0
-            while True:
-                if location == len(self.asks):
-                    self.asks.append((order.price, order.amount, order_id))
+            current_node = self.asks.head
+            while current_node != None:
+                if order_node.value.price < current_node.value.price:
+                    self.asks.add_before(order_node, current_node)
                     break
-
-                if order.price < self.asks[location][0]:
-                    self.asks.insert(location, (order.price, order.amount, order_id))
-                    break
-
-                location += 1
+                current_node = current_node.next
+            if current_node == None:
+                self.asks.append_back(order_node)
 
         else:
             raise ValueError("INVALID ORDER SIDE")
 
-        self.open_orders[order_id] = order
+        self.open_orders[order_id] = order_node
 
     def remove(self, order_id):
         if order_id not in self.open_orders:
             raise ValueError("ORDER NO LONGER OPEN")
 
-        order_to_remove = self.open_orders[order_id]
+        order_node_to_remove = self.open_orders[order_id]
 
-        if order_to_remove.side == BUY:
-            location = 0
-            while location < len(self.bids):
-                if self.bids[location][2] == order_id:
-                    break
-            del self.bids[location]
-
-        elif order_to_remove.side == SELL:
-            location = 0
-            while location < len(self.asks):
-                if self.asks[location][2] == order_id:
-                    break
-            del self.asks[location]
-
+        if order_node_to_remove.value.side == BUY:
+            self.bids.remove(order_node_to_remove)
+        elif order_node_to_remove.value.side == SELL:
+            self.asks.remove(order_node_to_remove)
         else:
             raise ValueError("INVALID ORDER SIZE")
 
@@ -91,21 +80,35 @@ class Book:
 
         bid_strings = []
         bid_max_length = 0
-        for bid_price, bid_amount, _ in self.bids:
+        current_node = self.bids.head
+        while current_node != None:
+            current_order = current_node.value
+            bid_price = current_order.price
+            bid_amount = current_order.amount
+
             # quad spaces used here to avoid length differences due to different tab lengths
             line_string = str(bid_amount) + "    $" + str(bid_price)
             bid_max_length = max(bid_max_length, len(line_string))
             bid_strings.append(line_string)
+
+            current_node = current_node.next
 
         for i in range(len(bid_strings)):
             bid_strings[i] = bid_strings[i] + " " * (bid_max_length - len(bid_strings[i]))
 
         ask_strings = []
         ask_max_length = 0
-        for ask_price, ask_amount, _ in self.asks:
+        current_node = self.asks.head
+        while current_node != None:
+            current_order = current_node.value
+            ask_price = current_order.price
+            ask_amount = current_order.amount
+
             line_string = "$" + str(ask_price) + "\t" + str(ask_amount)
             ask_max_length = max(ask_max_length, len(line_string))
             ask_strings.append(line_string)
+
+            current_node = current_node.next
 
         for i in range(len(ask_strings)):
             ask_strings[i] = ask_strings[i] + " " * (ask_max_length - len(ask_strings[i]))
