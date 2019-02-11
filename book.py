@@ -1,11 +1,8 @@
 import symbol
 
-from order import Order
-from order import BUY
-from order import SELL
+from order import *
 
-from linked_list import LinkedListNode
-from linked_list import LinkedList
+from linked_list import *
 
 class Book:
     def __init__(self, symbol):
@@ -82,8 +79,12 @@ class Book:
                 raise ValueError("INVALID ORDER SIDE")
 
             fill_size = min(best_bid_order.amount, best_ask_order.amount)
-            filled_orders.append((best_bid.key, BUY, strike_price, fill_size))
-            filled_orders.append((best_ask.key, SELL, strike_price, fill_size))
+            
+            filled_bid = Order(best_bid.symbol, BUY, strike_price, fill_size)
+            filled_orders.append((best_bid.key, best_bid_order, filled_bid))
+            
+            filled_ask = Order(best_ask.symbol, SELL, strike_price, fill_size)
+            filled_orders.append((best_ask.key, best_ask_order, filled_ask))
             
             if best_bid_order.amount > fill_size:
                 best_bid_order.amount -= fill_size
