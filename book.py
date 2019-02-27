@@ -80,12 +80,13 @@ class Book:
 
             fill_size = min(best_bid_order.amount, best_ask_order.amount)
             
-            filled_bid = Order(best_bid.symbol, BUY, strike_price, fill_size)
+            filled_bid = Order(best_bid_order.symbol, BUY, strike_price, fill_size)
             filled_orders.append((best_bid.key, best_bid_order, filled_bid))
             
-            filled_ask = Order(best_ask.symbol, SELL, strike_price, fill_size)
+            filled_ask = Order(best_ask_order.symbol, SELL, strike_price, fill_size)
             filled_orders.append((best_ask.key, best_ask_order, filled_ask))
             
+            should_break = False
             if best_bid_order.amount > fill_size:
                 best_bid_order.amount -= fill_size
             else:
@@ -93,8 +94,9 @@ class Book:
                 best_bid = self.bids.head
                 # the list may now be empty
                 if best_bid == None:
-                    break
-                best_bid_order = best_bid.value
+                    should_break = True
+                else:
+                    best_bid_order = best_bid.value
 
             if best_ask_order.amount > fill_size:
                 best_ask_order.amount -= fill_size
@@ -103,8 +105,11 @@ class Book:
                 best_ask = self.asks.head
                 # the list may now be empty
                 if best_ask == None:
-                    break
-                best_ask_order = best_ask.value
+                    should_break = True
+                else:
+                    best_ask_order = best_ask.value
+            if should_break:
+                break
 
         return filled_orders
 
@@ -164,15 +169,20 @@ class Book:
 
         return "\n".join(output)
 
+    def __repr__(self):
+        return str(self)
+
 if __name__ == "__main__":
-    bid_1 = Order(symbol.PARKER, BUY, 5, 20)
-    bid_2 = Order(symbol.PARKER, BUY, 4.95, 25)
-    bid_3 = Order(symbol.PARKER, BUY, 5.50, 25)
+    # bid_1 = Order(symbol.PARKER, BUY, 5, 20)
+    # bid_2 = Order(symbol.PARKER, BUY, 4.95, 25)
+    # bid_3 = Order(symbol.PARKER, BUY, 5.50, 25)
 
-    ask_1 = Order(symbol.PARKER, SELL, 5.1, 15)
-    ask_2 = Order(symbol.PARKER, SELL, 5.50, 7)
+    # ask_1 = Order(symbol.PARKER, SELL, 5.1, 15)
+    # ask_2 = Order(symbol.PARKER, SELL, 5.50, 7)
 
-    orders = [bid_1, bid_2, ask_1, ask_2, bid_3]
+    bid = Order(symbol.PARKER, BUY, 20, 10)
+    ask = Order(symbol.PARKER, SELL, 20, 10)
+    orders = [bid, ask]
 
     book = Book(symbol.PARKER)
     for i in range(len(orders)):

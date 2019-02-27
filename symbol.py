@@ -21,7 +21,7 @@ class Symbol:
     def __str__(self):
         return self.actual + " (" + self.ticker + ")"
 
-    def __repr__(self, other):
+    def __repr__(self):
         return str(self)
 
     def __hash__(self):
@@ -30,6 +30,7 @@ class Symbol:
 PARKER = Symbol("Parker", "PAH")
 JAKE   = Symbol("Jake", "JJG")
 ZEKE   = Symbol("Zeke", "BEL")
+ALL_SYMBOLS = [PARKER, JAKE, ZEKE]
 
 if __name__ == "__main__":
     for sym in [PARKER, JAKE, ZEKE]:
