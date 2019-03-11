@@ -33,7 +33,7 @@ class Message:
             data = int(data)
         elif typ == BOOK:
             if data != "ALL":
-                data = Symbol.deserialize(data)
+                data = Symbol.from_ticker(data)
         else:
             raise ValueError("INVALID MESSAGE TYPE")
         return Message(typ, data)

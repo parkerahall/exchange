@@ -22,6 +22,7 @@ class ServeThread(threading.Thread):
     def run(self):
         msg_id = 0
         with self.socket:
+            self.socket.send(encode("WELCOME TO THE EXCHANGE!"))
             while True:
                 raw_msg = self.socket.recv(MSG_SIZE).decode(BYTE_CODE).strip()
                 if not raw_msg:
@@ -29,6 +30,12 @@ class ServeThread(threading.Thread):
                 msg = Message.deserialize(raw_msg)
                 self.exchange.handle_message(msg, self.client_id, msg_id)
                 msg_id += 1
+                # try:
+                #     msg = Message.deserialize(raw_msg)
+                #     self.exchange.handle_message(msg, self.client_id, msg_id)
+                #     msg_id += 1
+                # except Exception as e:
+                #     self.socket.send(encode("ERROR OCCURRED: " + str(e)))
 
 class Exchange_Server:
     def __init__(self, host, port):
@@ -39,26 +46,31 @@ class Exchange_Server:
         self.book_locks = {symbol : threading.Lock() for symbol in ALL_SYMBOLS}
 
         self.clients = {}
+        self.order_ids = {}
 
     def handle_message(self, msg, client_id, msg_id):
-        unique_id = (client_id, msg_id)
-
         if msg.type == ADD:
             order = msg.data
             symbol = order.symbol
+            unique_id = (client_id, msg_id)
+            self.order_ids[unique_id] = symbol
             self.book_locks[symbol].acquire()
             filled_orders = self.books[symbol].add(order, unique_id)
             self.book_locks[symbol].release()
-            self.clients[client_id].send(encode("YOUR ORDER:\n" + str(order) + "\nHAS BEEN PLACED"))
+            self.clients[client_id].send(encode("YOUR ORDER:\n" + str(order) + "\nHAS BEEN PLACED WITH ORDER ID " + str(msg_id)))
             self.handle_filled_orders(filled_orders)
 
         elif msg.type == REMOVE:
             order_id = msg.data
+            unique_id = (client_id, order_id)
             try:
+                symbol = self.order_ids[unique_id]
                 self.book_locks[symbol].acquire()
-                self.books[symbol].remove(order_id)
+                self.books[symbol].remove(unique_id)
                 self.book_locks[symbol].release()
-                self.clients[client_id].send(encode("YOUR ORDER WITH ID " + str(order_id) + "HAS BEEN REMOVED"))
+                self.clients[client_id].send(encode("YOUR ORDER WITH ID " + str(order_id) + " HAS BEEN REMOVED"))
+
+                del self.order_ids[unique_id]
             except ValueError as e:
                 self.clients[client_id].send(encode("CANNOT REMOVE ORDER: " + str(e)))
 
