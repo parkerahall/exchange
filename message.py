@@ -6,9 +6,14 @@ REMOVE = "REMOVE"
 BOOK = "BOOK"
 ALL = "ALL"
 
+HELP = "HELP"
+MY_ORDERS = "MY ORDERS"
+
+ALL_TYPES = set([ADD, REMOVE, BOOK, HELP, MY_ORDERS])
+
 class Message:
     def __init__(self, typ, data):
-        assert (typ == ADD or typ == REMOVE or typ == BOOK)
+        assert typ in ALL_TYPES
         self.type = typ
         self.data = data
 
@@ -20,12 +25,19 @@ class Message:
             type_string += Order.serialize(self.data)
         elif isinstance(self.data, Symbol):
             type_string += Symbol.serialize(self.data)
-        else:
+        elif isinstance(self.data, str):
             type_string += self.data
+        else:
+            type_string = type_string[:-1]
         return type_string
 
     @classmethod
     def deserialize(cls, code):
+        if code == HELP:
+            return Message(HELP, None)
+        elif code == MY_ORDERS:
+            return Message(MY_ORDERS, None)
+        
         typ, data = code.split("-")
         if typ == ADD:
             data = Order.deserialize(data)

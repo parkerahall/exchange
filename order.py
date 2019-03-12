@@ -12,13 +12,16 @@ class Order:
         self.price = price
         self.amount = amount
 
+    def copy(self):
+        return Order(self.symbol, self.side, self.price, self.amount)
+
     def serialize(self):
-        attributes = [str(self.symbol), self.side, str(self.price), str(self.amount)]
+        attributes = [str(self.symbol), self.side, str(self.amount), str(self.price)]
         return "|".join(attributes)
 
     @classmethod
     def deserialize(cls, code):
-        sym, side, price, amount = code.split("|")
+        sym, side, amount, price = code.split("|")
         sym = Symbol.deserialize(sym)
         price = float(price)
         amount = int(amount)

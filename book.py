@@ -81,10 +81,10 @@ class Book:
             fill_size = min(best_bid_order.amount, best_ask_order.amount)
             
             filled_bid = Order(best_bid_order.symbol, BUY, strike_price, fill_size)
-            filled_orders.append((best_bid.key, best_bid_order, filled_bid))
+            filled_orders.append((best_bid.key, best_bid_order.copy(), filled_bid))
             
             filled_ask = Order(best_ask_order.symbol, SELL, strike_price, fill_size)
-            filled_orders.append((best_ask.key, best_ask_order, filled_ask))
+            filled_orders.append((best_ask.key, best_ask_order.copy(), filled_ask))
             
             should_break = False
             if best_bid_order.amount > fill_size:

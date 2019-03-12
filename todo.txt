@@ -1,3 +1,2 @@
-- help message/function for clients
 - logging (print or file)
 - UI / website
