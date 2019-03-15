@@ -54,16 +54,17 @@ class ServeThread(threading.Thread):
                     msg = Message.deserialize(raw_msg.upper())
                     self.exchange.handle_message(msg, self.client_id, msg_id)
                     msg_id += 1
-                except Exception as e:
-                    error_msg = "ERROR OCCURRED: " + str(e)
+                except Exception:
+                    error_msg = "INVALID INPUT: " + raw_msg
                     self.exchange.write_to_log(encode_for_logging(error_msg, (self.client_id, msg_id)))
                     if self.exchange.debug:
                         raise e
                     else:
                         self.socket.send(encode(error_msg))
 
-        log_msg = "CLIENT " + str(self.client_id) + " HAS DISCONNECTED"
-        self.exchange.write_to_log(encode_for_logging(log_msg))
+        disconnect_msg = "CLIENT " + str(self.client_id) + " HAS DISCONNECTED"
+        print(disconnect_msg)
+        self.exchange.write_to_log(encode_for_logging(disconnect_msg))
         del self.exchange.clients[self.client_id]
 
 class Exchange_Server:
@@ -221,5 +222,5 @@ if __name__ == "__main__":
     if len(sys.argv) > 2:
         debug = bool(sys.argv[2])
     log_file = open("logs/log_" + str(datetime.datetime.now().date()) + ".txt", "a")
-    server = Exchange_Server('18.30.3.82', port, log_file, debug)
+    server = Exchange_Server('localhost', port, log_file, debug)
     server.serve()
