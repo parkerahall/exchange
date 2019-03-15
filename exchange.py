@@ -1,6 +1,7 @@
 import sys
 import socket
 import threading
+import datetime
 
 from book import *
 from symbol import *
@@ -12,13 +13,27 @@ BYTE_CODE = "utf-8"
 def encode(string):
     return (string + "\n\n").encode(BYTE_CODE)
 
+def encode_for_logging(string, unique_id=None):
+    date = datetime.datetime.now()
+    log_string = str(date) + ": "
+    if unique_id != None:
+        client_id, msg_id = unique_id
+        log_string += "CLIENT " + str(client_id) + ", MESSAGE " + str(msg_id) + ": "
+    log_string += string + "\n"
+    return log_string
+
 
 WELCOME_MESSAGE = encode("WELCOME TO THE EXCHANGE!\nType 'help' for more info")
 
 HELP_MESSAGE = encode("Valid commands:\n" +
                "ADD-TICKER|SIDE|AMOUNT|PRICE to add an order\n" +
                "REMOVE-ID to remove an order\n" +
-               "BOOK-TICKER to see open orders on the book (use 'ALL' for all tickers)")
+               "BOOK-TICKER to see open orders on the book (use 'ALL' for all tickers)\n\n" +
+               "press 'enter' to exit the exchange")
+
+OPEN_MESSAGE = "EXCHANGE OPENED"
+
+EXIT_MESSAGE = "EXCHANGE CLOSED"
 
 class ServeThread(threading.Thread):
     def __init__(self, exchange, sock, cid):
@@ -40,15 +55,19 @@ class ServeThread(threading.Thread):
                     self.exchange.handle_message(msg, self.client_id, msg_id)
                     msg_id += 1
                 except Exception as e:
+                    error_msg = "ERROR OCCURRED: " + str(e)
+                    self.exchange.write_to_log(encode_for_logging(error_msg, (self.client_id, msg_id)))
                     if self.exchange.debug:
                         raise e
                     else:
-                        self.socket.send(encode("ERROR OCCURRED: " + str(e)))
+                        self.socket.send(encode(error_msg))
 
+        log_msg = "CLIENT " + str(self.client_id) + " HAS DISCONNECTED"
+        self.exchange.write_to_log(encode_for_logging(log_msg))
         del self.exchange.clients[self.client_id]
 
 class Exchange_Server:
-    def __init__(self, host, port, debug):
+    def __init__(self, host, port, log_file, debug):
         self.host = host
         self.port = port
 
@@ -58,9 +77,13 @@ class Exchange_Server:
         self.clients = {}
         self.order_ids = {}
 
+        self.log_file = log_file
         self.debug = debug
 
     def handle_message(self, msg, client_id, msg_id):
+        log_msg = "MESSAGE RECEIVED: " + str(msg)
+        self.write_to_log(encode_for_logging(log_msg, (client_id, msg_id)))
+
         if msg.type == HELP:
             self.clients[client_id].send(HELP_MESSAGE)
 
@@ -70,12 +93,20 @@ class Exchange_Server:
         elif msg.type == ADD:
             order = msg.data
             symbol = order.symbol
+            
             unique_id = (client_id, msg_id)
             self.order_ids[unique_id] = symbol
+            
             self.book_locks[symbol].acquire()
             filled_orders = self.books[symbol].add(order.copy(), unique_id)
             self.book_locks[symbol].release()
-            self.clients[client_id].send(encode(str(order) + "\nHAS BEEN PLACED WITH ORDER ID " + str(msg_id)))
+            
+            confirm_msg = str(order) + "\nHAS BEEN PLACED WITH ORDER ID " + str(msg_id)
+            self.clients[client_id].send(encode(confirm_msg))
+            
+            log_msg = "MESSAGE SENT: " + confirm_msg
+            self.write_to_log(encode_for_logging(log_msg, (client_id, msg_id)))
+            
             self.handle_filled_orders(filled_orders)
 
         elif msg.type == REMOVE:
@@ -83,14 +114,25 @@ class Exchange_Server:
             unique_id = (client_id, order_id)
             try:
                 symbol = self.order_ids[unique_id]
+                
                 self.book_locks[symbol].acquire()
                 self.books[symbol].remove(unique_id)
                 self.book_locks[symbol].release()
-                self.clients[client_id].send(encode("ORDER " + str(order_id) + " HAS BEEN REMOVED"))
+                
+                confirm_msg = "ORDER " + str(order_id) + " HAS BEEN REMOVED"
+                self.clients[client_id].send(encode(confirm_msg))
+                
+                log_msg = "MESSAGE SENT: " + confirm_msg
+                self.write_to_log(encode_for_logging(log_msg, (client_id, msg_id)))
 
                 del self.order_ids[unique_id]
             except ValueError as e:
-                self.clients[client_id].send(encode("CANNOT REMOVE ORDER: " + str(e)))
+                error_msg = "CANNOT REMOVE ORDER: " + str(e)
+                self.write_to_log(encode_for_logging(error_msg, (client_id, msg_id)))
+                if self.debug:
+                    raise e
+                else:
+                    self.clients[client_id].send(encode(error_msg))
 
         elif msg.type == BOOK:
             symbol = msg.data
@@ -101,17 +143,28 @@ class Exchange_Server:
                 self.book_locks[key].release()
 
         else:
-            self.clients[client_id].send(encode("MESSAGE TYPE NOT SUPPORTED: " + str(msg)))
+            error_msg = "MESSAGE TYPE NOT SUPPORTED: " + str(msg)
+            self.clients[client_id].send(encode(error_msg))
+
+            log_msg = "MESSAGE SENT: " + error_msg
+            self.write_to_log(encode_for_logging(log_msg, (client_id, msg_id)))
+
 
     def handle_filled_orders(self, filled_orders):
         for unique_id, placed_order, filled_order in filled_orders:
             client_id, msg_id = unique_id
+            partially = "" if placed_order.amount == filled_order.amount else " PARTIALLY"
+            
+            log_msg = "ORDER: " + str(placed_order) + partially + " FILLED: " + str(filled_order)
+            self.write_to_log(encode_for_logging(log_msg, unique_id))
+            
             if client_id in self.clients:
                 partially = "" if placed_order.amount == filled_order.amount else "PARTIALLY "
-                send_string = encode("ORDER " + str(msg_id) + ":\n" + str(placed_order) + "\nHAS BEEN " + partially + "FILLED:\n" + str(filled_order))
+                send_string = encode("ORDER " + str(msg_id) + ":\n" + str(placed_order) + "\nHAS BEEN" + partially + " FILLED:\n" + str(filled_order))
                 self.clients[client_id].send(send_string)
             else:
-                print("Client ID " + str(client_id) + " not found")
+                missing_msg = "CLIENT ID " + str(client_id) + " NOT FOUND"
+                self.write_to_log(encode_for_logging(missing_msg))
 
     def send_open_orders(self, client_id):
         sent = False
@@ -128,8 +181,14 @@ class Exchange_Server:
 
         if not sent:
             self.clients[client_id].send(encode("NO OPEN ORDERS FOUND"))
+    def write_to_log(self, string):
+        self.log_file.write(string)
+        self.log_file.flush()
 
     def serve(self):
+        self.write_to_log(encode_for_logging(OPEN_MESSAGE))
+        print("\n" + OPEN_MESSAGE + "\n")
+        
         server = socket.socket()
         server.bind((self.host, self.port))
         server.listen()
@@ -140,7 +199,11 @@ class Exchange_Server:
             while True:
                 conn, addr = server.accept()
                 ip, port = addr
-                print("CONNECTION MADE AT " + ip + ": " + str(port))
+                
+                connect_msg = "CLIENT " + str(client_id) + " CONNECTED AT " + ip + ": " + str(port)
+                print(connect_msg)
+
+                self.write_to_log(encode_for_logging(connect_msg))
 
                 self.clients[client_id] = conn
                 new_thread = ServeThread(self, conn, client_id)
@@ -149,12 +212,14 @@ class Exchange_Server:
                 client_id += 1
         except KeyboardInterrupt:
             server.close()
-            print("\nEXCHANGE CLOSED\n")
+            self.write_to_log(encode_for_logging(EXIT_MESSAGE))
+            print("\n" + EXIT_MESSAGE + "\n")
 
 if __name__ == "__main__":
     debug = False
     port = int(sys.argv[1])
     if len(sys.argv) > 2:
         debug = bool(sys.argv[2])
-    server = Exchange_Server('localhost', port, debug)
+    log_file = open("logs/log_" + str(datetime.datetime.now().date()) + ".txt", "a")
+    server = Exchange_Server('18.30.3.82', port, log_file, debug)
     server.serve()
