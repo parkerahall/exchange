@@ -47,13 +47,22 @@ class ServeThread(threading.Thread):
         with self.socket:
             self.socket.send(WELCOME_MESSAGE)
             while True:
-                raw_msg = self.socket.recv(MSG_SIZE).decode(BYTE_CODE).strip()
-                if not raw_msg:
+                raw_msg_stream = self.socket.recv(MSG_SIZE).decode(BYTE_CODE)
+                if raw_msg_stream == "\n":
                     break
                 try:
-                    msg = Message.deserialize(raw_msg.upper())
-                    self.exchange.handle_message(msg, self.client_id, msg_id)
-                    msg_id += 1
+                    extra = [raw_msg_stream[-1]]
+                    while extra[-1] != "\n":
+                        extra.append(self.socket.recv(1).decode(BYTE_CODE))
+
+                    raw_msgs = raw_msg_stream.strip().split("\n")
+                    for i in range(len(raw_msgs)):
+                        raw_msg = raw_msgs[i]
+                        if i == len(raw_msgs) - 1:
+                            raw_msg += "".join(extra[1:])
+                        msg = Message.deserialize(raw_msg.upper())
+                        self.exchange.handle_message(msg, self.client_id, msg_id)
+                        msg_id += 1
                 except Exception:
                     error_msg = "INVALID INPUT: " + raw_msg
                     self.exchange.write_to_log(encode_for_logging(error_msg, (self.client_id, msg_id)))
