@@ -59,7 +59,7 @@ class ServeThread(threading.Thread):
                     for i in range(len(raw_msgs)):
                         raw_msg = raw_msgs[i]
                         if i == len(raw_msgs) - 1:
-                            raw_msg += "".join(extra[1:])
+                            raw_msg += "".join(extra[1:-1])
                         msg = Message.deserialize(raw_msg.upper())
                         self.exchange.handle_message(msg, self.client_id, msg_id)
                         msg_id += 1
@@ -169,7 +169,6 @@ class Exchange_Server:
             self.write_to_log(encode_for_logging(log_msg, unique_id))
             
             if client_id in self.clients:
-                partially = "" if placed_order.amount == filled_order.amount else "PARTIALLY "
                 send_string = encode("ORDER " + str(msg_id) + ":\n" + str(placed_order) + "\nHAS BEEN" + partially + " FILLED:\n" + str(filled_order))
                 self.clients[client_id].send(send_string)
             else:
