@@ -37,7 +37,7 @@ EXIT_MESSAGE = "EXCHANGE CLOSED"
 
 class ServeThread(threading.Thread):
     def __init__(self, exchange, sock, cid):
-        super(ServeThread, self).__init__()
+        super(ServeThread, self).__init__(daemon=True)
         self.exchange = exchange
         self.socket = sock
         self.client_id = cid
@@ -63,7 +63,7 @@ class ServeThread(threading.Thread):
                         msg = Message.deserialize(raw_msg.upper())
                         self.exchange.handle_message(msg, self.client_id, msg_id)
                         msg_id += 1
-                except Exception:
+                except Exception as e:
                     error_msg = "INVALID INPUT: " + raw_msg
                     self.exchange.write_to_log(encode_for_logging(error_msg, (self.client_id, msg_id)))
                     if self.exchange.debug:
@@ -76,10 +76,35 @@ class ServeThread(threading.Thread):
         self.exchange.write_to_log(encode_for_logging(disconnect_msg))
         del self.exchange.clients[self.client_id]
 
+class StreamThread(threading.Thread):
+    def __init__(self, exchange):
+        super(StreamThread, self).__init__(daemon=True)
+        self.exchange = exchange
+        self.server = socket.socket()
+
+    def run(self):
+        self.server.bind((self.exchange.host, self.exchange.stream_port))
+        self.server.listen()
+
+        try:
+            while True:
+                conn, addr = self.server.accept()
+                ip, port = addr
+
+                conn.send(encode(OPEN_MESSAGE))
+                self.exchange.stream_clients_lock.acquire()
+                self.exchange.stream_clients.append(conn)
+                self.exchange.stream_clients_lock.release()
+        except KeyboardInterrupt:
+            self.server.close()
+
 class Exchange_Server:
-    def __init__(self, host, port, log_file, debug):
+    def __init__(self, host, order_port, stream_port, log_file, debug):
         self.host = host
-        self.port = port
+        self.order_port = order_port
+        self.stream_port = stream_port
+        self.stream_clients = []
+        self.stream_clients_lock = threading.Lock()
 
         self.books = {symbol : Book(symbol) for symbol in ALL_SYMBOLS}
         self.book_locks = {symbol : threading.Lock() for symbol in ALL_SYMBOLS}
@@ -106,10 +131,23 @@ class Exchange_Server:
             
             unique_id = (client_id, msg_id)
             self.order_ids[unique_id] = symbol
+
+            stream_message = "ORDER PLACED: " + str(order)
+            self.stream_clients_lock.acquire()
+            for client in self.stream_clients:
+                client.send(encode(stream_message))
+            self.stream_clients_lock.release()
             
             self.book_locks[symbol].acquire()
             filled_orders = self.books[symbol].add(order.copy(), unique_id)
             self.book_locks[symbol].release()
+
+            self.stream_clients_lock.acquire()
+            for _, _, order in filled_orders:
+                stream_message = "ORDER FILLED: " + str(order)
+                for client in self.stream_clients:
+                    client.send(encode(stream_message))
+            self.stream_clients_lock.release()
             
             confirm_msg = str(order) + "\nHAS BEEN PLACED WITH ORDER ID " + str(msg_id)
             self.clients[client_id].send(encode(confirm_msg))
@@ -124,10 +162,18 @@ class Exchange_Server:
             unique_id = (client_id, order_id)
             try:
                 symbol = self.order_ids[unique_id]
+
+                order = self.books[symbol].get_open_order(unique_id)
                 
                 self.book_locks[symbol].acquire()
                 self.books[symbol].remove(unique_id)
                 self.book_locks[symbol].release()
+
+                stream_message = "ORDER REMOVED: " + str(order)
+                self.stream_clients_lock.acquire()
+                for client in self.stream_clients:
+                    client.send(encode(stream_message))
+                self.stream_clients_lock.release()
                 
                 confirm_msg = "ORDER " + str(order_id) + " HAS BEEN REMOVED"
                 self.clients[client_id].send(encode(confirm_msg))
@@ -190,6 +236,17 @@ class Exchange_Server:
 
         if not sent:
             self.clients[client_id].send(encode("NO OPEN ORDERS FOUND"))
+    
+    def close_order_clients(self):
+        for client_id in self.clients:
+            self.clients[client_id].send(encode(EXIT_MESSAGE))
+            self.clients[client_id].close()
+
+    def close_stream_clients(self):
+        for stream_client in self.stream_clients:
+            stream_client.send(encode(EXIT_MESSAGE))
+            stream_client.close()
+
     def write_to_log(self, string):
         self.log_file.write(string)
         self.log_file.flush()
@@ -197,9 +254,12 @@ class Exchange_Server:
     def serve(self):
         self.write_to_log(encode_for_logging(OPEN_MESSAGE))
         print("\n" + OPEN_MESSAGE + "\n")
+
+        stream_thread = StreamThread(self)
+        stream_thread.start()
         
         server = socket.socket()
-        server.bind((self.host, self.port))
+        server.bind((self.host, self.order_port))
         server.listen()
 
         client_id = 0
@@ -221,14 +281,17 @@ class Exchange_Server:
                 client_id += 1
         except KeyboardInterrupt:
             server.close()
+            self.close_order_clients()
+            self.close_stream_clients()
             self.write_to_log(encode_for_logging(EXIT_MESSAGE))
             print("\n" + EXIT_MESSAGE + "\n")
 
 if __name__ == "__main__":
     debug = False
-    port = int(sys.argv[1])
+    order_port = int(sys.argv[1])
+    stream_port = int(sys.argv[2])
     if len(sys.argv) > 2:
         debug = bool(sys.argv[2])
     log_file = open("logs/log_" + str(datetime.datetime.now().date()) + ".txt", "a")
-    server = Exchange_Server('localhost', port, log_file, debug)
+    server = Exchange_Server('localhost', order_port, stream_port, log_file, debug)
     server.serve()

@@ -113,6 +113,8 @@ class Book:
 
         return filled_orders
 
+    def get_open_order(self, order_id):
+        return self.open_orders[order_id].value
 
     def __str__(self):
         output = [str(self.symbol) + ":"]
