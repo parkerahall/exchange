@@ -18,7 +18,7 @@ class Message:
         self.data = data
 
     def serialize(self):
-        type_string = self.type + "-"
+        type_string = f"{self.type}-"
         if isinstance(self.data, int):
             type_string += str(self.data)
         elif isinstance(self.data, Order):
@@ -45,7 +45,7 @@ class Message:
             data = int(data)
         elif typ == BOOK:
             if data != "ALL":
-                data = Symbol.from_ticker(data)
+                data = Symbol.deserialize(data)
         else:
             raise ValueError("INVALID MESSAGE TYPE")
         return Message(typ, data)

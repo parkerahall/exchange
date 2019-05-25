@@ -16,7 +16,7 @@ class Order:
         return Order(self.symbol, self.side, self.price, self.amount)
 
     def serialize(self):
-        attributes = [str(self.symbol), self.side, str(self.amount), str(self.price)]
+        attributes = [self.symbol.serialize(), self.side, str(self.amount), str(self.price)]
         return "|".join(attributes)
 
     @classmethod
@@ -35,7 +35,7 @@ class Order:
         return same_amount and same_side and same_price and same_amount
 
     def __str__(self):
-        return str(self.symbol) + " " + self.side + " " + str(self.amount) + " @ " + str(self.price)
+        return f"{str(self.symbol)} {self.side} {str(self.amount)} @ {str(self.price)}"
 
     def __repr__(self):
         return str(self)
