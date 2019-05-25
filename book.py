@@ -117,7 +117,7 @@ class Book:
         return self.open_orders[order_id].value
 
     def __str__(self):
-        output = [str(self.symbol) + ":"]
+        output = [f"{str(self.symbol)}:"]
 
         bid_strings = []
         bid_max_length = 0
@@ -128,14 +128,14 @@ class Book:
             bid_amount = current_order.amount
 
             # quad spaces used here to avoid length differences due to different tab lengths
-            line_string = str(bid_amount) + "    $" + str(bid_price)
+            line_string = f"{str(bid_amount)}    ${str(bid_price)}"
             bid_max_length = max(bid_max_length, len(line_string))
             bid_strings.append(line_string)
 
             current_node = current_node.next
 
         for i in range(len(bid_strings)):
-            bid_strings[i] = bid_strings[i] + " " * (bid_max_length - len(bid_strings[i]))
+            bid_strings[i] += " " * (bid_max_length - len(bid_strings[i]))
 
         ask_strings = []
         ask_max_length = 0
@@ -145,28 +145,29 @@ class Book:
             ask_price = current_order.price
             ask_amount = current_order.amount
 
-            line_string = "$" + str(ask_price) + "\t" + str(ask_amount)
+            # quad spaces used her to avoid length differences due to different tab lengths
+            line_string = f"${str(ask_price)}    {str(ask_amount)}"
             ask_max_length = max(ask_max_length, len(line_string))
             ask_strings.append(line_string)
 
             current_node = current_node.next
 
         for i in range(len(ask_strings)):
-            ask_strings[i] = ask_strings[i] + " " * (ask_max_length - len(ask_strings[i]))
+            ask_strings[i] += " " * (ask_max_length - len(ask_strings[i]))
 
         min_length = min(len(bid_strings), len(ask_strings))
         
         for i in range(min_length):
-            line_string = bid_strings[i] + " | " + ask_strings[i]
+            line_string = f"{bid_strings[i]} | {ask_strings[i]}"
             output.append(line_string)
 
         for i in range(min_length, len(bid_strings)):
-            line_string = bid_strings[i] + " | "
+            line_string = f"{bid_strings[i]} | "
             output.append(line_string)
 
         empty_bid = " " * bid_max_length
         for i in range(min_length, len(ask_strings)):
-            line_string = empty_bid + " | " + ask_strings[i]
+            line_string = f"{empty_bid} | {ask_strings[i]}"
             output.append(line_string)
 
         return "\n".join(output)
@@ -175,16 +176,16 @@ class Book:
         return str(self)
 
 if __name__ == "__main__":
-    # bid_1 = Order(symbol.PARKER, BUY, 5, 20)
-    # bid_2 = Order(symbol.PARKER, BUY, 4.95, 25)
-    # bid_3 = Order(symbol.PARKER, BUY, 5.50, 25)
+    bid_1 = Order(symbol.PARKER, BUY, 5, 20)
+    bid_2 = Order(symbol.PARKER, BUY, 4.95, 25)
+    bid_3 = Order(symbol.PARKER, BUY, 5.50, 25)
 
-    # ask_1 = Order(symbol.PARKER, SELL, 5.1, 15)
-    # ask_2 = Order(symbol.PARKER, SELL, 5.50, 7)
+    ask_1 = Order(symbol.PARKER, SELL, 5.1, 15)
+    ask_2 = Order(symbol.PARKER, SELL, 5.50, 7)
 
-    bid = Order(symbol.PARKER, BUY, 20, 10)
-    ask = Order(symbol.PARKER, SELL, 20, 10)
-    orders = [bid, ask]
+    # bid = Order(symbol.PARKER, BUY, 20, 10)
+    # ask = Order(symbol.PARKER, SELL, 20, 10)
+    orders = [bid_1, ask_1, bid_2, ask_2, bid_3]
 
     book = Book(symbol.PARKER)
     for i in range(len(orders)):
