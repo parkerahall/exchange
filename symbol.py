@@ -29,7 +29,7 @@ class Symbol:
         return self.ticker == other.ticker
 
     def __str__(self):
-        return self.actual + " (" + self.ticker + ")"
+        return f"{self.actual} ({self.ticker})"
 
     def __repr__(self):
         return str(self)
